@@ -1,25 +1,58 @@
 // ==========================================
-// 1. Load States, Crops and Seasons
+// CROP YIELD PREDICTION
+// Frontend JavaScript
+// ==========================================
+
+
+// ==========================================
+// API URL
+// ==========================================
+
+const API_BASE_URL =
+    "https://crop-yield-prediction-api-cizc.onrender.com";
+
+
+// ==========================================
+// DOM ELEMENTS
+// ==========================================
+
+const form =
+    document.getElementById("predictionForm");
+
+const result =
+    document.getElementById("result");
+
+const predictBtn =
+    document.getElementById("predictBtn");
+
+
+// ==========================================
+// LOAD STATES, CROPS AND SEASONS
 // ==========================================
 
 async function loadOptions() {
 
     try {
 
-        const response = await fetch(
-            "http://127.0.0.1:5000/options"
-        );
+        const response =
+            await fetch(
+                `${API_BASE_URL}/options`
+            );
 
         if (!response.ok) {
-            throw new Error("Unable to load options");
+
+            throw new Error(
+                "Unable to load options"
+            );
         }
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
 
-        // -------------------------
-        // State Dropdown
-        // -------------------------
+        // ------------------------------
+        // STATES
+        // ------------------------------
 
         const stateSelect =
             document.getElementById("state");
@@ -27,22 +60,26 @@ async function loadOptions() {
         stateSelect.innerHTML =
             '<option value="">Select State</option>';
 
-        data.states.forEach(function (state) {
+        data.states.forEach(
+            function (state) {
 
-            const option =
-                document.createElement("option");
+                const option =
+                    document.createElement(
+                        "option"
+                    );
 
-            option.value = state;
-            option.textContent = state;
+                option.value = state;
 
-            stateSelect.appendChild(option);
+                option.textContent = state;
 
-        });
+                stateSelect.appendChild(option);
+            }
+        );
 
 
-        // -------------------------
-        // Crop Dropdown
-        // -------------------------
+        // ------------------------------
+        // CROPS
+        // ------------------------------
 
         const cropSelect =
             document.getElementById("crop");
@@ -50,22 +87,26 @@ async function loadOptions() {
         cropSelect.innerHTML =
             '<option value="">Select Crop</option>';
 
-        data.crops.forEach(function (crop) {
+        data.crops.forEach(
+            function (crop) {
 
-            const option =
-                document.createElement("option");
+                const option =
+                    document.createElement(
+                        "option"
+                    );
 
-            option.value = crop;
-            option.textContent = crop;
+                option.value = crop;
 
-            cropSelect.appendChild(option);
+                option.textContent = crop;
 
-        });
+                cropSelect.appendChild(option);
+            }
+        );
 
 
-        // -------------------------
-        // Season Dropdown
-        // -------------------------
+        // ------------------------------
+        // SEASONS
+        // ------------------------------
 
         const seasonSelect =
             document.getElementById("season");
@@ -73,290 +114,478 @@ async function loadOptions() {
         seasonSelect.innerHTML =
             '<option value="">Select Season</option>';
 
-        data.seasons.forEach(function (season) {
+        data.seasons.forEach(
+            function (season) {
 
-            const option =
-                document.createElement("option");
+                const option =
+                    document.createElement(
+                        "option"
+                    );
 
-            option.value = season;
-            option.textContent = season;
+                option.value = season;
 
-            seasonSelect.appendChild(option);
+                option.textContent = season;
 
-        });
+                seasonSelect.appendChild(option);
+            }
+        );
 
-    }
 
-    catch (error) {
+        console.log(
+            "Options loaded successfully."
+        );
+
+    } catch (error) {
 
         console.error(
             "Error loading options:",
             error
         );
 
-    }
+        document.getElementById(
+            "state"
+        ).innerHTML =
+            '<option value="">Unable to load states</option>';
 
+        document.getElementById(
+            "crop"
+        ).innerHTML =
+            '<option value="">Unable to load crops</option>';
+
+        document.getElementById(
+            "season"
+        ).innerHTML =
+            '<option value="">Unable to load seasons</option>';
+    }
 }
 
 
 // ==========================================
-// 2. Prediction Form
+// SHOW DEFAULT RESULT
 // ==========================================
 
-document
-    .getElementById("predictionForm")
-    .addEventListener(
-        "submit",
-        async function (event) {
+function showDefaultResult() {
 
-            event.preventDefault();
+    result.innerHTML = `
+
+        <div class="result-circle">
+
+            <div class="plant-icon">
+                🌱
+            </div>
+
+            <div class="yield-value">
+                —
+            </div>
+
+            <div class="yield-unit">
+                Predicted Yield
+            </div>
+
+        </div>
+
+        <h3>
+            Predicted Crop Yield
+        </h3>
+
+        <div class="result-info">
+
+            <span>💡</span>
+
+            <p>
+                Enter the agricultural parameters
+                and click Predict Yield to get the
+                machine learning prediction.
+            </p>
+
+        </div>
+    `;
+}
 
 
-            // -------------------------
-            // Get Result Box
-            // -------------------------
+// ==========================================
+// VALIDATION
+// ==========================================
 
-            const result =
-                document.getElementById("result");
+function validateInput(data) {
 
 
-            // -------------------------
-            // Get User Inputs
-            // -------------------------
+    if (
+        !Number.isFinite(data.Year) ||
+        data.Year < 2000 ||
+        data.Year > 2026
+    ) {
 
-            const year =
+        return "❌ Year must be between 2000 and 2026.";
+    }
+
+
+    if (!data.State) {
+
+        return "❌ Please select a state.";
+    }
+
+
+    if (!data.Crop) {
+
+        return "❌ Please select a crop.";
+    }
+
+
+    if (!data.Season) {
+
+        return "❌ Please select a season.";
+    }
+
+
+    if (
+        !Number.isFinite(data.Area) ||
+        data.Area <= 0
+    ) {
+
+        return "❌ Area must be greater than 0.";
+    }
+
+
+    if (
+        !Number.isFinite(data.Annual_Rainfall) ||
+        data.Annual_Rainfall < 0
+    ) {
+
+        return "❌ Rainfall cannot be negative.";
+    }
+
+
+    if (
+        !Number.isFinite(data.Fertilizer) ||
+        data.Fertilizer < 0
+    ) {
+
+        return "❌ Fertilizer cannot be negative.";
+    }
+
+
+    if (
+        !Number.isFinite(data.Pesticide) ||
+        data.Pesticide < 0
+    ) {
+
+        return "❌ Pesticide cannot be negative.";
+    }
+
+
+    return null;
+}
+
+
+// ==========================================
+// FORM SUBMIT
+// ==========================================
+
+form.addEventListener(
+    "submit",
+    async function (event) {
+
+        event.preventDefault();
+
+
+        // ----------------------------------
+        // GET INPUT VALUES
+        // ----------------------------------
+
+        const data = {
+
+            Year:
                 Number(
-                    document.getElementById("year").value
+                    document.getElementById(
+                        "year"
+                    ).value
+                ),
+
+            State:
+                document.getElementById(
+                    "state"
+                ).value,
+
+            Crop:
+                document.getElementById(
+                    "crop"
+                ).value,
+
+            Season:
+                document.getElementById(
+                    "season"
+                ).value,
+
+            Area:
+                Number(
+                    document.getElementById(
+                        "area"
+                    ).value
+                ),
+
+            Annual_Rainfall:
+                Number(
+                    document.getElementById(
+                        "rainfall"
+                    ).value
+                ),
+
+            Fertilizer:
+                Number(
+                    document.getElementById(
+                        "fertilizer"
+                    ).value
+                ),
+
+            Pesticide:
+                Number(
+                    document.getElementById(
+                        "pesticide"
+                    ).value
+                )
+        };
+
+
+        // ----------------------------------
+        // VALIDATE
+        // ----------------------------------
+
+        const validationError =
+            validateInput(data);
+
+
+        if (validationError) {
+
+            result.innerHTML = `
+
+                <div class="error-message">
+                    ${validationError}
+                </div>
+
+            `;
+
+            return;
+        }
+
+
+        // ----------------------------------
+        // LOADING
+        // ----------------------------------
+
+        predictBtn.disabled = true;
+
+        predictBtn.classList.add(
+            "loading"
+        );
+
+        predictBtn.innerHTML = `
+            <span>⏳</span>
+            <span>Predicting...</span>
+        `;
+
+
+        result.innerHTML = `
+
+            <div class="result-circle">
+
+                <div class="plant-icon">
+                    🌱
+                </div>
+
+                <div class="yield-value">
+                    ...
+                </div>
+
+                <div class="yield-unit">
+                    Processing
+                </div>
+
+            </div>
+
+            <h3>
+                Calculating Prediction
+            </h3>
+
+        `;
+
+
+        // ----------------------------------
+        // API REQUEST
+        // ----------------------------------
+
+        try {
+
+            const response =
+                await fetch(
+                    `${API_BASE_URL}/predict`,
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify(data)
+                    }
                 );
 
-            const state =
-                document.getElementById("state").value;
 
-            const crop =
-                document.getElementById("crop").value;
+            // --------------------------------
+            // SERVER ERROR
+            // --------------------------------
 
-            const season =
-                document.getElementById("season").value;
+            if (!response.ok) {
 
-            const area =
-                Number(
-                    document.getElementById("area").value
-                );
+                let errorMessage =
+                    "Prediction server returned an error.";
 
-            const rainfall =
-                Number(
-                    document.getElementById("rainfall").value
-                );
+                try {
 
-            const fertilizer =
-                Number(
-                    document.getElementById("fertilizer").value
-                );
+                    const errorData =
+                        await response.json();
 
-            const pesticide =
-                Number(
-                    document.getElementById("pesticide").value
-                );
+                    if (
+                        errorData.error
+                    ) {
 
+                        errorMessage =
+                            errorData.error;
+                    }
 
-            // -------------------------
-            // Validation
-            // -------------------------
+                } catch (_) {
 
-            if (year < 2000 || year > 2026) {
-
-                result.innerHTML =
-                    "❌ Year must be between 2000 and 2026.";
-
-                return;
-            }
-
-
-            if (!state) {
-
-                result.innerHTML =
-                    "❌ Please select a state.";
-
-                return;
-            }
-
-
-            if (!crop) {
-
-                result.innerHTML =
-                    "❌ Please select a crop.";
-
-                return;
-            }
-
-
-            if (!season) {
-
-                result.innerHTML =
-                    "❌ Please select a season.";
-
-                return;
-            }
-
-
-            if (area <= 0) {
-
-                result.innerHTML =
-                    "❌ Area must be greater than 0.";
-
-                return;
-            }
-
-
-            if (rainfall < 0) {
-
-                result.innerHTML =
-                    "❌ Rainfall cannot be negative.";
-
-                return;
-            }
-
-
-            if (fertilizer < 0) {
-
-                result.innerHTML =
-                    "❌ Fertilizer cannot be negative.";
-
-                return;
-            }
-
-
-            if (pesticide < 0) {
-
-                result.innerHTML =
-                    "❌ Pesticide cannot be negative.";
-
-                return;
-            }
-
-
-            // -------------------------
-            // Prepare Data
-            // -------------------------
-
-            const data = {
-
-                Year: year,
-
-                State: state,
-
-                Crop: crop,
-
-                Season: season,
-
-                Area: area,
-
-                Annual_Rainfall: rainfall,
-
-                Fertilizer: fertilizer,
-
-                Pesticide: pesticide
-
-            };
-
-
-            // -------------------------
-            // Show Loading
-            // -------------------------
-
-            result.innerHTML =
-                "⏳ Predicting...";
-
-
-            // -------------------------
-            // Send Data to Flask
-            // -------------------------
-
-            try {
-
-                const response =
-                    await fetch(
-                        "http://127.0.0.1:5000/predict",
-                        {
-                            method: "POST",
-
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-
-                            body:
-                                JSON.stringify(data)
-                        }
-                    );
-
-
-                // -------------------------
-                // Check Server Response
-                // -------------------------
-
-                if (!response.ok) {
-
-                    throw new Error(
-                        "Server returned an error"
-                    );
-
+                    // Ignore JSON parsing error
                 }
 
-
-                // -------------------------
-                // Get Prediction
-                // -------------------------
-
-                const resultData =
-                    await response.json();
+                throw new Error(
+                    errorMessage
+                );
+            }
 
 
-                // -------------------------
-                // Show Prediction
-                // -------------------------
+            // --------------------------------
+            // GET RESULT
+            // --------------------------------
 
-                result.innerHTML = `
+            const resultData =
+                await response.json();
 
-                    <div class="result-title">
-                        🌾 Prediction Result
+
+            if (
+                typeof resultData.predicted_yield
+                !== "number"
+            ) {
+
+                throw new Error(
+                    "Invalid prediction received."
+                );
+            }
+
+
+            const prediction =
+                resultData.predicted_yield;
+
+
+            // --------------------------------
+            // SHOW RESULT
+            // --------------------------------
+
+            result.innerHTML = `
+
+                <div class="result-circle">
+
+                    <div class="plant-icon">
+                        🌱
                     </div>
 
                     <div class="yield-value">
-                        ${resultData.predicted_yield.toFixed(2)}
+                        ${prediction.toFixed(2)}
                     </div>
 
-                    <div class="result-label">
-                        Predicted Crop Yield
+                    <div class="yield-unit">
+                        Predicted Yield
                     </div>
 
-                `;
+                </div>
 
-            }
+                <h3>
+                    Predicted Crop Yield
+                </h3>
+
+                <div class="result-info">
+
+                    <span>💡</span>
+
+                    <p>
+                        This is the estimated crop yield
+                        generated by the trained machine
+                        learning model based on your
+                        selected inputs.
+                    </p>
+
+                </div>
+
+            `;
 
 
-            // -------------------------
-            // Error Handling
-            // -------------------------
+            console.log(
+                "Prediction:",
+                prediction
+            );
 
-            catch (error) {
+        } catch (error) {
 
-                result.innerHTML =
-                    "❌ Unable to connect to prediction server.";
+            console.error(
+                "Prediction Error:",
+                error
+            );
 
-                console.error(
-                    "Prediction Error:",
-                    error
-                );
 
-            }
+            result.innerHTML = `
 
+                <div class="error-message">
+
+                    ❌ Unable to get prediction.
+
+                    <br><br>
+
+                    Please check the server
+                    connection and try again.
+
+                </div>
+
+            `;
+
+        } finally {
+
+
+            // --------------------------------
+            // RESET BUTTON
+            // --------------------------------
+
+            predictBtn.disabled = false;
+
+            predictBtn.classList.remove(
+                "loading"
+            );
+
+            predictBtn.innerHTML = `
+                <span>⌁</span>
+                <span>Predict Yield</span>
+            `;
         }
-    );
+
+    }
+);
 
 
 // ==========================================
-// 3. Load Dropdown Options on Page Load
+// INITIALIZE
 // ==========================================
+
+showDefaultResult();
 
 loadOptions();
