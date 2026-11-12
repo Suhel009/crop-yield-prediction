@@ -51,6 +51,34 @@ async function loadOptions() {
         const data =
             await response.json();
 
+        // Keep the input year range aligned with the actual training dataset.
+        const yearInput = document.getElementById("year");
+        if (Number.isInteger(data.year_min) && Number.isInteger(data.year_max)) {
+            yearInput.min = String(data.year_min);
+            yearInput.max = String(data.year_max);
+            yearInput.value = String(data.year_max);
+        }
+        const compareSelect = document.getElementById("compareCrops");
+        compareSelect.innerHTML = "";
+        data.crops.forEach((crop) => {
+            const option = document.createElement("option");
+            option.value = crop;
+            option.textContent = crop;
+            compareSelect.appendChild(option);
+        });
+
+        const stateCount = document.getElementById("datasetStates");
+        const cropCount = document.getElementById("datasetCrops");
+        const recordCount = document.getElementById("datasetRecords");
+        const yearRange = document.getElementById("datasetYears");
+        const seasonCount = data.seasons.length;
+        if (recordCount) recordCount.textContent = Number(data.dataset_rows).toLocaleString();
+        if (cropCount) cropCount.textContent = data.crops.length.toLocaleString();
+        if (stateCount) stateCount.textContent = data.states.length.toLocaleString();
+        if (yearRange) yearRange.textContent = `${data.year_min}–${data.year_max}`;
+        const seasonsMetric = document.getElementById("datasetSeasons");
+        if (seasonsMetric) seasonsMetric.textContent = seasonCount.toLocaleString();
+
 
         // ------------------------------
         // STATES
@@ -214,8 +242,8 @@ function validateInput(data) {
 
     if (
         !Number.isFinite(data.Year) ||
-        data.Year < 2000 ||
-        data.Year > 2026
+        data.Year < Number(document.getElementById("year").min) ||
+        data.Year > Number(document.getElementById("year").max)
     ) {
 
         return "❌ Year must be between 2000 and 2026.";
@@ -488,6 +516,12 @@ form.addEventListener(
                 throw new Error("The server returned an invalid prediction.");
             }
 
+            savePredictionHistory(data, prediction);
+
+            if (!Number.isFinite(prediction)) {
+                throw new Error("The server returned an invalid prediction.");
+            }
+
 
             // --------------------------------
             // SHOW RESULT
@@ -606,3 +640,153 @@ async function checkApiHealth() {
     }
 }
 checkApiHealth();
+
+
+// ==========================================
+// DATASET SUMMARY + API STATUS
+// ==========================================
+async function refreshApiStatus() {
+    const badge = document.getElementById("apiStatus");
+    if (!badge) return;
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            headers: { "Accept": "application/json" },
+            signal: AbortSignal.timeout(12000)
+        });
+        if (!response.ok) throw new Error("API unavailable");
+        badge.textContent = "Prediction API online";
+        badge.classList.add("is-online");
+        badge.classList.remove("is-offline");
+    } catch (_) {
+        badge.textContent = "Prediction API unavailable";
+        badge.classList.add("is-offline");
+        badge.classList.remove("is-online");
+    }
+}
+
+// ==========================================
+// PREDICTION HISTORY (DEVICE-LOCAL)
+// ==========================================
+const HISTORY_KEY = "cropYieldPredictionHistoryV1";
+function getPredictionHistory() {
+    try {
+        const entries = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+        return Array.isArray(entries) ? entries.slice(0, 8) : [];
+    } catch (_) {
+        return [];
+    }
+}
+function renderPredictionHistory() {
+    const container = document.getElementById("predictionHistory");
+    if (!container) return;
+    const entries = getPredictionHistory();
+    if (!entries.length) {
+        container.innerHTML = '<p class="history-empty">Your recent predictions will appear here on this device.</p>';
+        return;
+    }
+    container.innerHTML = "";
+    entries.forEach((entry) => {
+        const item = document.createElement("article");
+        item.className = "history-item";
+        const details = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = entry.crop;
+        const meta = document.createElement("small");
+        meta.textContent = `${entry.state} · ${entry.season} · ${entry.year}`;
+        details.append(title, meta);
+        const value = document.createElement("b");
+        value.textContent = Number(entry.yield).toFixed(2);
+        item.append(details, value);
+        container.appendChild(item);
+    });
+}
+function savePredictionHistory(inputs, prediction) {
+    const entries = getPredictionHistory();
+    entries.unshift({
+        crop: inputs.Crop, state: inputs.State, season: inputs.Season,
+        year: inputs.Year, yield: prediction, createdAt: new Date().toISOString()
+    });
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, 8))); } catch (_) {}
+    renderPredictionHistory();
+}
+document.getElementById("clearHistoryBtn")?.addEventListener("click", () => {
+    try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
+    renderPredictionHistory();
+});
+
+// ==========================================
+// MULTI-CROP COMPARISON
+// ==========================================
+document.getElementById("compareBtn")?.addEventListener("click", async () => {
+    const compareBtn = document.getElementById("compareBtn");
+    const selectedCrops = Array.from(document.getElementById("compareCrops").selectedOptions).map(option => option.value);
+    if (selectedCrops.length < 2 || selectedCrops.length > 8) {
+        result.innerHTML = '<div class="error-message" role="alert">Select between 2 and 8 crops to compare.</div>';
+        return;
+    }
+    const inputs = {
+        Year: Number(document.getElementById("year").value),
+        State: document.getElementById("state").value,
+        Crop: selectedCrops[0],
+        Season: document.getElementById("season").value,
+        Area: Number(document.getElementById("area").value),
+        Annual_Rainfall: Number(document.getElementById("rainfall").value),
+        Fertilizer: Number(document.getElementById("fertilizer").value),
+        Pesticide: Number(document.getElementById("pesticide").value),
+        crops: selectedCrops
+    };
+    const validation = validateInput(inputs);
+    if (validation) {
+        result.innerHTML = `<div class="error-message" role="alert">${validation}</div>`;
+        return;
+    }
+    compareBtn.disabled = true;
+    compareBtn.textContent = "Comparing crops…";
+    result.innerHTML = '<div class="result-info"><p>Running the same model against each selected crop…</p></div>';
+    try {
+        const response = await fetch(`${API_BASE_URL}/compare`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify(inputs),
+            signal: AbortSignal.timeout(30000)
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "Crop comparison failed.");
+        result.innerHTML = "";
+        const heading = document.createElement("h3");
+        heading.textContent = "Crop yield comparison";
+        result.appendChild(heading);
+        const note = document.createElement("p");
+        note.className = "comparison-note";
+        note.textContent = "Ranked estimates for the same state, season, year and farm inputs.";
+        result.appendChild(note);
+        payload.predictions.forEach((item, index) => {
+            const row = document.createElement("div");
+            row.className = "comparison-row";
+            const name = document.createElement("span");
+            name.textContent = `${index + 1}. ${item.crop}`;
+            const score = document.createElement("strong");
+            score.textContent = Number(item.predicted_yield).toFixed(2);
+            row.append(name, score);
+            result.appendChild(row);
+        });
+        const winner = payload.predictions[0];
+        const winnerNote = document.createElement("div");
+        winnerNote.className = "result-info comparison-winner";
+        winnerNote.textContent = `Highest model estimate in this comparison: ${winner.crop} (${Number(winner.predicted_yield).toFixed(2)}). This is a model estimate, not a farming guarantee.`;
+        result.appendChild(winnerNote);
+    } catch (error) {
+        result.innerHTML = "";
+        const message = document.createElement("div");
+        message.className = "error-message";
+        message.setAttribute("role", "alert");
+        message.textContent = error.name === "TimeoutError" ? "Crop comparison timed out. Please retry." : error.message;
+        result.appendChild(message);
+    } finally {
+        compareBtn.disabled = false;
+        compareBtn.textContent = "Compare Selected Crops";
+    }
+});
+
+renderPredictionHistory();
+refreshApiStatus();
