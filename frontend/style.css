@@ -1202,3 +1202,15 @@ footer {
 @media (max-width: 800px) { .stats-strip { gap: 9px; } .stat-card { padding: 13px; } .stat-card strong { font-size: 22px; } .history-section { padding: 20px; } }
 @media (max-width: 450px) { .history-heading { align-items: flex-start; } .stat-card small { font-size: 10px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+
+
+/* Keep the model label in normal document flow on desktop and mobile. */
+.model-badge {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    margin: 0 0 14px;
+    right: auto;
+    top: auto;
+}
+.unit-note { display: block; margin-top: 10px; color: #718078; font-size: 11px; }
