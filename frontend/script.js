@@ -1,591 +1,316 @@
-// ==========================================
-// CROP YIELD PREDICTION
-// Frontend JavaScript
-// ==========================================
+// Crop Yield Intelligence — frontend application
+// Configure a different backend by setting window.CROP_YIELD_API_URL before this file.
+const API_BASE_URL = (window.CROP_YIELD_API_URL ||
+    "https://crop-yield-prediction-api-cizc.onrender.com").replace(/\/$/, "");
 
+const form = document.getElementById("predictionForm");
+const result = document.getElementById("result");
+const predictBtn = document.getElementById("predictBtn");
+const compareBtn = document.getElementById("compareBtn");
+const yearInput = document.getElementById("year");
+const HISTORY_KEY = "cropYieldPredictionHistoryV1";
 
-// ==========================================
-// API URL
-// ==========================================
+async function fetchJson(path, options = {}, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+            ...options,
+            signal: controller.signal,
+            headers: { Accept: "application/json", ...(options.headers || {}) }
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(body.error || `Request failed (${response.status}).`);
+        }
+        return body;
+    } catch (error) {
+        if (error.name === "AbortError") {
+            throw new Error("The server took too long to respond. Please try again.");
+        }
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
-const API_BASE_URL =
-    "https://crop-yield-prediction-api-cizc.onrender.com";
+function setApiStatus(online, message) {
+    const badge = document.getElementById("apiStatus");
+    if (!badge) return;
+    badge.textContent = message;
+    badge.classList.toggle("is-online", online);
+    badge.classList.toggle("is-offline", !online);
+}
 
-
-// ==========================================
-// DOM ELEMENTS
-// ==========================================
-
-const form =
-    document.getElementById("predictionForm");
-
-const result =
-    document.getElementById("result");
-
-const predictBtn =
-    document.getElementById("predictBtn");
-
-
-// ==========================================
-// LOAD STATES, CROPS AND SEASONS
-// ==========================================
+function setSelectOptions(id, values, placeholder) {
+    const select = document.getElementById(id);
+    select.replaceChildren(new Option(placeholder, ""));
+    values.forEach(value => select.add(new Option(value, value)));
+}
 
 async function loadOptions() {
-
     try {
+        const data = await fetchJson("/options", {}, 20000);
+        setSelectOptions("state", data.states || [], "Select State");
+        setSelectOptions("crop", data.crops || [], "Select Crop");
+        setSelectOptions("season", data.seasons || [], "Select Season");
+        setSelectOptions("compareCrops", data.crops || [], "Select crops to compare");
 
-        const response =
-            await fetch(
-                `${API_BASE_URL}/options`
-            );
-
-        if (!response.ok) {
-
-            throw new Error(
-                "Unable to load options"
-            );
+        if (Number.isInteger(data.year_min) && Number.isInteger(data.year_max)) {
+            yearInput.min = String(data.year_min);
+            yearInput.max = String(data.year_max);
+            yearInput.value = String(data.year_max);
         }
 
-        const data =
-            await response.json();
-
-
-        // ------------------------------
-        // STATES
-        // ------------------------------
-
-        const stateSelect =
-            document.getElementById("state");
-
-        stateSelect.innerHTML =
-            '<option value="">Select State</option>';
-
-        data.states.forEach(
-            function (state) {
-
-                const option =
-                    document.createElement(
-                        "option"
-                    );
-
-                option.value = state;
-
-                option.textContent = state;
-
-                stateSelect.appendChild(option);
-            }
-        );
-
-
-        // ------------------------------
-        // CROPS
-        // ------------------------------
-
-        const cropSelect =
-            document.getElementById("crop");
-
-        cropSelect.innerHTML =
-            '<option value="">Select Crop</option>';
-
-        data.crops.forEach(
-            function (crop) {
-
-                const option =
-                    document.createElement(
-                        "option"
-                    );
-
-                option.value = crop;
-
-                option.textContent = crop;
-
-                cropSelect.appendChild(option);
-            }
-        );
-
-
-        // ------------------------------
-        // SEASONS
-        // ------------------------------
-
-        const seasonSelect =
-            document.getElementById("season");
-
-        seasonSelect.innerHTML =
-            '<option value="">Select Season</option>';
-
-        data.seasons.forEach(
-            function (season) {
-
-                const option =
-                    document.createElement(
-                        "option"
-                    );
-
-                option.value = season;
-
-                option.textContent = season;
-
-                seasonSelect.appendChild(option);
-            }
-        );
-
-
-        console.log(
-            "Options loaded successfully."
-        );
-
+        const metrics = {
+            datasetRecords: Number(data.dataset_rows || 0).toLocaleString(),
+            datasetCrops: (data.crops || []).length.toLocaleString(),
+            datasetStates: (data.states || []).length.toLocaleString(),
+            datasetYears: `${data.year_min}–${data.year_max}`
+        };
+        Object.entries(metrics).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value;
+        });
+        return true;
     } catch (error) {
-
-        console.error(
-            "Error loading options:",
-            error
-        );
-
-        document.getElementById(
-            "state"
-        ).innerHTML =
-            '<option value="">Unable to load states</option>';
-
-        document.getElementById(
-            "crop"
-        ).innerHTML =
-            '<option value="">Unable to load crops</option>';
-
-        document.getElementById(
-            "season"
-        ).innerHTML =
-            '<option value="">Unable to load seasons</option>';
+        setApiStatus(false, "Dataset options unavailable");
+        ["state", "crop", "season", "compareCrops"].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.disabled = true;
+        });
+        showError(error.message);
+        return false;
     }
 }
 
-
-// ==========================================
-// SHOW DEFAULT RESULT
-// ==========================================
-
-function showDefaultResult() {
-
-    result.innerHTML = `
-
-        <div class="result-circle">
-
-            <div class="plant-icon">
-                🌱
-            </div>
-
-            <div class="yield-value">
-                —
-            </div>
-
-            <div class="yield-unit">
-                Predicted Yield
-            </div>
-
-        </div>
-
-        <h3>
-            Predicted Crop Yield
-        </h3>
-
-        <div class="result-info">
-
-            <span>💡</span>
-
-            <p>
-                Enter the agricultural parameters
-                and click Predict Yield to get the
-                machine learning prediction.
-            </p>
-
-        </div>
-    `;
+function readForm() {
+    return {
+        Year: Number(document.getElementById("year").value),
+        State: document.getElementById("state").value,
+        Crop: document.getElementById("crop").value,
+        Season: document.getElementById("season").value,
+        Area: Number(document.getElementById("area").value),
+        Annual_Rainfall: Number(document.getElementById("rainfall").value),
+        Fertilizer: Number(document.getElementById("fertilizer").value),
+        Pesticide: Number(document.getElementById("pesticide").value)
+    };
 }
-
-
-// ==========================================
-// VALIDATION
-// ==========================================
 
 function validateInput(data) {
-
-
-    if (
-        !Number.isFinite(data.Year) ||
-        data.Year < 2000 ||
-        data.Year > 2026
-    ) {
-
-        return "❌ Year must be between 2000 and 2026.";
+    const minYear = Number(yearInput.min || 2000);
+    const maxYear = Number(yearInput.max || 2026);
+    if (!Number.isInteger(data.Year) || data.Year < minYear || data.Year > maxYear) {
+        return `Year must be a whole number between ${minYear} and ${maxYear}.`;
     }
-
-
-    if (!data.State) {
-
-        return "❌ Please select a state.";
-    }
-
-
-    if (!data.Crop) {
-
-        return "❌ Please select a crop.";
-    }
-
-
-    if (!data.Season) {
-
-        return "❌ Please select a season.";
-    }
-
-
-    if (
-        !Number.isFinite(data.Area) ||
-        data.Area <= 0
-    ) {
-
-        return "❌ Area must be greater than 0.";
-    }
-
-
-    if (
-        !Number.isFinite(data.Annual_Rainfall) ||
-        data.Annual_Rainfall < 0
-    ) {
-
-        return "❌ Rainfall cannot be negative.";
-    }
-
-
-    if (
-        !Number.isFinite(data.Fertilizer) ||
-        data.Fertilizer < 0
-    ) {
-
-        return "❌ Fertilizer cannot be negative.";
-    }
-
-
-    if (
-        !Number.isFinite(data.Pesticide) ||
-        data.Pesticide < 0
-    ) {
-
-        return "❌ Pesticide cannot be negative.";
-    }
-
-
+    if (!data.State) return "Please select a state.";
+    if (!data.Crop) return "Please select a crop.";
+    if (!data.Season) return "Please select a season.";
+    if (!Number.isFinite(data.Area) || data.Area <= 0) return "Area must be greater than zero.";
+    if (!Number.isFinite(data.Annual_Rainfall) || data.Annual_Rainfall < 0) return "Rainfall cannot be negative.";
+    if (!Number.isFinite(data.Fertilizer) || data.Fertilizer < 0) return "Fertilizer cannot be negative.";
+    if (!Number.isFinite(data.Pesticide) || data.Pesticide < 0) return "Pesticide cannot be negative.";
     return null;
 }
 
-
-// ==========================================
-// FORM SUBMIT
-// ==========================================
-
-form.addEventListener(
-    "submit",
-    async function (event) {
-
-        event.preventDefault();
-
-
-        // ----------------------------------
-        // GET INPUT VALUES
-        // ----------------------------------
-
-        const data = {
-
-            Year:
-                Number(
-                    document.getElementById(
-                        "year"
-                    ).value
-                ),
-
-            State:
-                document.getElementById(
-                    "state"
-                ).value,
-
-            Crop:
-                document.getElementById(
-                    "crop"
-                ).value,
-
-            Season:
-                document.getElementById(
-                    "season"
-                ).value,
-
-            Area:
-                Number(
-                    document.getElementById(
-                        "area"
-                    ).value
-                ),
-
-            Annual_Rainfall:
-                Number(
-                    document.getElementById(
-                        "rainfall"
-                    ).value
-                ),
-
-            Fertilizer:
-                Number(
-                    document.getElementById(
-                        "fertilizer"
-                    ).value
-                ),
-
-            Pesticide:
-                Number(
-                    document.getElementById(
-                        "pesticide"
-                    ).value
-                )
-        };
-
-
-        // ----------------------------------
-        // VALIDATE
-        // ----------------------------------
-
-        const validationError =
-            validateInput(data);
-
-
-        if (validationError) {
-
-            result.innerHTML = `
-
-                <div class="error-message">
-                    ${validationError}
-                </div>
-
-            `;
-
-            return;
-        }
-
-
-        // ----------------------------------
-        // LOADING
-        // ----------------------------------
-
-        predictBtn.disabled = true;
-
-        predictBtn.classList.add(
-            "loading"
-        );
-
-        predictBtn.innerHTML = `
-            <span>⏳</span>
-            <span>Predicting...</span>
-        `;
-
-
-        result.innerHTML = `
-
-            <div class="result-circle">
-
-                <div class="plant-icon">
-                    🌱
-                </div>
-
-                <div class="yield-value">
-                    ...
-                </div>
-
-                <div class="yield-unit">
-                    Processing
-                </div>
-
-            </div>
-
-            <h3>
-                Calculating Prediction
-            </h3>
-
-        `;
-
-
-        // ----------------------------------
-        // API REQUEST
-        // ----------------------------------
-
-        try {
-
-            const response =
-                await fetch(
-                    `${API_BASE_URL}/predict`,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body:
-                            JSON.stringify(data)
-                    }
-                );
-
-
-            // --------------------------------
-            // SERVER ERROR
-            // --------------------------------
-
-            if (!response.ok) {
-
-                let errorMessage =
-                    "Prediction server returned an error.";
-
-                try {
-
-                    const errorData =
-                        await response.json();
-
-                    if (
-                        errorData.error
-                    ) {
-
-                        errorMessage =
-                            errorData.error;
-                    }
-
-                } catch (_) {
-
-                    // Ignore JSON parsing error
-                }
-
-                throw new Error(
-                    errorMessage
-                );
-            }
-
-
-            // --------------------------------
-            // GET RESULT
-            // --------------------------------
-
-            const resultData =
-                await response.json();
-
-
-            if (
-                typeof resultData.predicted_yield
-                !== "number"
-            ) {
-
-                throw new Error(
-                    "Invalid prediction received."
-                );
-            }
-
-
-            const prediction =
-                resultData.predicted_yield;
-
-
-            // --------------------------------
-            // SHOW RESULT
-            // --------------------------------
-
-            result.innerHTML = `
-
-                <div class="result-circle">
-
-                    <div class="plant-icon">
-                        🌱
-                    </div>
-
-                    <div class="yield-value">
-                        ${prediction.toFixed(2)}
-                    </div>
-
-                    <div class="yield-unit">
-                        Predicted Yield
-                    </div>
-
-                </div>
-
-                <h3>
-                    Predicted Crop Yield
-                </h3>
-
-                <div class="result-info">
-
-                    <span>💡</span>
-
-                    <p>
-                        This is the estimated crop yield
-                        generated by the trained machine
-                        learning model based on your
-                        selected inputs.
-                    </p>
-
-                </div>
-
-            `;
-
-
-            console.log(
-                "Prediction:",
-                prediction
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Prediction Error:",
-                error
-            );
-
-
-            result.innerHTML = `
-
-                <div class="error-message">
-
-                    ❌ Unable to get prediction.
-
-                    <br><br>
-
-                    Please check the server
-                    connection and try again.
-
-                </div>
-
-            `;
-
-        } finally {
-
-
-            // --------------------------------
-            // RESET BUTTON
-            // --------------------------------
-
-            predictBtn.disabled = false;
-
-            predictBtn.classList.remove(
-                "loading"
-            );
-
-            predictBtn.innerHTML = `
-                <span>⌁</span>
-                <span>Predict Yield</span>
-            `;
-        }
-
+function showError(message) {
+    result.replaceChildren();
+    const panel = document.createElement("div");
+    panel.className = "error-message";
+    panel.setAttribute("role", "alert");
+    panel.textContent = message;
+    result.appendChild(panel);
+}
+
+function showPrediction(value, unit = "dataset yield units") {
+    result.innerHTML = `
+        <div class="result-circle">
+            <div class="plant-icon">🌱</div>
+            <div class="yield-value">${value.toFixed(2)}</div>
+            <div class="yield-unit">Predicted Yield</div>
+        </div>
+        <h3>Predicted Crop Yield</h3>
+        <div class="result-info">
+            <span>💡</span>
+            <p>Estimate generated by the trained machine learning model. The number uses the yield units represented in the source dataset.</p>
+        </div>
+    `;
+    const unitNote = document.createElement("small");
+    unitNote.className = "unit-note";
+    unitNote.textContent = `Unit: ${unit}`;
+    result.appendChild(unitNote);
+}
+
+function getHistory() {
+    try {
+        const items = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+        return Array.isArray(items) ? items.slice(0, 8) : [];
+    } catch (_) {
+        return [];
     }
-);
+}
 
+function renderHistory() {
+    const container = document.getElementById("predictionHistory");
+    if (!container) return;
+    const entries = getHistory();
+    container.replaceChildren();
+    if (!entries.length) {
+        const empty = document.createElement("p");
+        empty.className = "history-empty";
+        empty.textContent = "Your recent predictions will appear here on this device.";
+        container.appendChild(empty);
+        return;
+    }
+    entries.forEach(entry => {
+        const row = document.createElement("article");
+        row.className = "history-item";
+        const detail = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = entry.crop;
+        const meta = document.createElement("small");
+        meta.textContent = `${entry.state} · ${entry.season} · ${entry.year}`;
+        detail.append(title, meta);
+        const amount = document.createElement("b");
+        amount.textContent = Number(entry.yield).toFixed(2);
+        row.append(detail, amount);
+        container.appendChild(row);
+    });
+}
 
-// ==========================================
-// INITIALIZE
-// ==========================================
+function saveHistory(data, prediction) {
+    const history = getHistory();
+    history.unshift({
+        crop: data.Crop, state: data.State, season: data.Season,
+        year: data.Year, yield: prediction
+    });
+    try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 8)));
+    } catch (_) {
+        // Local storage may be unavailable in private browsing; prediction still succeeds.
+    }
+    renderHistory();
+}
 
-showDefaultResult();
+form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const data = readForm();
+    const validationError = validateInput(data);
+    if (validationError) {
+        showError(validationError);
+        return;
+    }
 
+    predictBtn.disabled = true;
+    predictBtn.classList.add("loading");
+    predictBtn.textContent = "Predicting…";
+    result.innerHTML = '<div class="result-info"><p>Running the trained model…</p></div>';
+
+    try {
+        const payload = await fetchJson("/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        }, 30000);
+        const value = Number(payload.predicted_yield);
+        if (!Number.isFinite(value)) throw new Error("The prediction service returned an invalid result.");
+        showPrediction(value, payload.unit);
+        saveHistory(data, value);
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        predictBtn.disabled = false;
+        predictBtn.classList.remove("loading");
+        predictBtn.innerHTML = "<span>⌁</span><span>Predict Yield</span>";
+    }
+});
+
+compareBtn.addEventListener("click", async () => {
+    const crops = Array.from(document.getElementById("compareCrops").selectedOptions)
+        .map(option => option.value);
+    if (crops.length < 2 || crops.length > 8) {
+        showError("Select between 2 and 8 crops to compare.");
+        return;
+    }
+
+    const inputs = { ...readForm(), crops };
+    const validationError = validateInput({ ...inputs, Crop: crops[0] });
+    if (validationError) {
+        showError(validationError);
+        return;
+    }
+
+    compareBtn.disabled = true;
+    compareBtn.textContent = "Comparing crops…";
+    result.innerHTML = '<div class="result-info"><p>Applying the same conditions to each selected crop…</p></div>';
+    try {
+        const payload = await fetchJson("/compare", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(inputs)
+        }, 40000);
+
+        result.replaceChildren();
+        const heading = document.createElement("h3");
+        heading.textContent = "Crop yield comparison";
+        result.appendChild(heading);
+        const caption = document.createElement("p");
+        caption.className = "comparison-note";
+        caption.textContent = "Ranked estimates using the same state, season, year and farm inputs.";
+        result.appendChild(caption);
+
+        payload.predictions.forEach((item, index) => {
+            const row = document.createElement("div");
+            row.className = "comparison-row";
+            const crop = document.createElement("span");
+            crop.textContent = `${index + 1}. ${item.crop}`;
+            const prediction = document.createElement("strong");
+            prediction.textContent = Number(item.predicted_yield).toFixed(2);
+            row.append(crop, prediction);
+            result.appendChild(row);
+        });
+
+        const note = document.createElement("div");
+        note.className = "result-info comparison-winner";
+        const top = payload.predictions[0];
+        note.textContent = `Highest model estimate in this comparison: ${top.crop}. Model estimates are not agronomic guarantees.`;
+        result.appendChild(note);
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        compareBtn.disabled = false;
+        compareBtn.textContent = "Compare Selected Crops";
+    }
+});
+
+document.getElementById("clearHistoryBtn").addEventListener("click", () => {
+    try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
+    renderHistory();
+});
+
+async function refreshApiStatus() {
+    try {
+        const health = await fetchJson("/health", {}, 12000);
+        setApiStatus(health.status === "healthy", health.status === "healthy"
+            ? "Prediction API online" : "Prediction API unavailable");
+    } catch (_) {
+        setApiStatus(false, "Prediction API unavailable");
+    }
+}
+
+function showInitialResult() {
+    result.innerHTML = `
+        <div class="result-circle">
+            <div class="plant-icon">🌱</div>
+            <div class="yield-value">—</div>
+            <div class="yield-unit">Predicted Yield</div>
+        </div>
+        <h3>Predicted Crop Yield</h3>
+        <div class="result-info"><span>💡</span><p>Enter your farm parameters and predict a yield, or compare multiple crops under identical conditions.</p></div>
+    `;
+}
+
+showInitialResult();
+renderHistory();
 loadOptions();
+refreshApiStatus();
