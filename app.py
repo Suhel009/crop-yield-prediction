@@ -167,13 +167,23 @@ def home():
 
 @app.get("/health")
 def health():
-    try:
-        load_artifacts()
-        load_options()
-        return jsonify({"status": "healthy", "model_loaded": True, "dataset_loaded": True})
-    except Exception:
-        logger.exception("Health check failed")
-        return jsonify({"status": "unavailable", "model_loaded": False}), 503
+    # Keep this endpoint cheap: it should not deserialize the 67 MB model on
+    # every dashboard visit or wake a worker unnecessarily.
+    artifacts_available = MODEL_PATH.is_file() and PREPROCESSOR_PATH.is_file()
+    dataset_available = DATASET_PATH.is_file()
+    if not artifacts_available or not dataset_available:
+        return jsonify({
+            "status": "unavailable",
+            "model_loaded": model is not None,
+            "artifacts_available": artifacts_available,
+            "dataset_available": dataset_available,
+        }), 503
+    return jsonify({
+        "status": "healthy",
+        "model_loaded": model is not None,
+        "artifacts_available": True,
+        "dataset_available": True,
+    })
 
 
 @app.get("/options")
