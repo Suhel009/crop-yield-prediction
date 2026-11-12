@@ -34,6 +34,12 @@ class PredictionApiTests(unittest.TestCase):
             "year_min": 2000,
             "year_max": 2026,
             "dataset_rows": 17321,
+            "input_units": {
+                "Area": "hectares internally; acres accepted and converted",
+                "Annual_Rainfall": "millimetres per year (mm)",
+                "Fertilizer": "total kilograms (kg) over the selected crop area",
+                "Pesticide": "total kilograms (kg) over the selected crop area",
+            },
             "data_quality": {
                 "checked_records": 100,
                 "match_within_5pct_records": 66,
