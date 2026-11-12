@@ -1117,3 +1117,37 @@ footer {
     }
 
 }
+
+/* Production dashboard refinements */
+.api-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #eef3ef;
+    color: #52645a;
+    font-size: 12px;
+    font-weight: 700;
+}
+.api-status::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #8a9a90;
+}
+.api-status.is-online { background: #e8f7ed; color: #087b40; }
+.api-status.is-online::before { background: #16a05a; box-shadow: 0 0 0 4px rgba(22,160,90,.12); }
+.api-status.is-offline { background: #fff1ed; color: #aa4227; }
+.api-status.is-offline::before { background: #d85b3d; }
+.error-message { text-align: left; line-height: 1.6; }
+.error-message p { margin-top: 8px; }
+.predict-btn:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid rgba(39,168,94,.35);
+    outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
