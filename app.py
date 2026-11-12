@@ -52,6 +52,41 @@ FEATURES = [
 NUMERIC_FIELDS = ["Year", "Area", "Annual_Rainfall", "Fertilizer", "Pesticide"]
 CATEGORICAL_FIELDS = ["State", "Crop", "Season"]
 
+# Model feature units. Fertilizer and pesticide are total mass used over the
+# selected crop area; Area is converted to hectares before model inference.
+ACRE_TO_HECTARE = 0.40468564224
+AREA_UNIT_ALIASES = {
+    "ha": "hectare",
+    "hectare": "hectare",
+    "hectares": "hectare",
+    "acre": "acre",
+    "acres": "acre",
+}
+MASS_YIELD_CROPS = "tonnes"
+COUNT_YIELD_CROPS = {"coconut"}
+
+
+def crop_yield_units(crop):
+    """Return crop-aware target and total-production units.
+
+    Coconut production in the source records is expressed as nut counts;
+    mass-producing crops are represented in metric tonnes. Never compare
+    model output values across these unit groups.
+    """
+    if str(crop).strip().casefold() in COUNT_YIELD_CROPS:
+        return {
+            "yield_unit": "nuts/ha",
+            "production_unit": "nuts",
+            "unit_group": "count",
+            "unit_note": "Coconut yield is expressed as nuts per hectare.",
+        }
+    return {
+        "yield_unit": "tonnes/ha",
+        "production_unit": "tonnes",
+        "unit_group": "mass",
+        "unit_note": "Yield is expressed as metric tonnes per hectare.",
+    }
+
 
 def load_artifacts():
     """Load trusted, version-matched joblib files once per worker."""
@@ -63,7 +98,6 @@ def load_artifacts():
             return
         if not MODEL_PATH.is_file() or not PREPROCESSOR_PATH.is_file():
             raise FileNotFoundError("Model artifacts are missing from the models/ directory.")
-        # Only load model files shipped with this trusted repository.
         loaded_model = joblib.load(MODEL_PATH)
         loaded_preprocessor = joblib.load(PREPROCESSOR_PATH)
         model, preprocessor = loaded_model, loaded_preprocessor
@@ -94,12 +128,18 @@ def load_options():
             "year_min": int(years.min()) if not years.empty else 2000,
             "year_max": int(years.max()) if not years.empty else 2026,
             "dataset_rows": int(len(frame)),
+            "input_units": {
+                "Area": "hectare (acre is accepted and converted to hectare)",
+                "Annual_Rainfall": "mm/year",
+                "Fertilizer": "kg total for the selected crop area",
+                "Pesticide": "kg total for the selected crop area",
+            },
         }
     return options_cache
 
 
 def parse_prediction_input(payload, crop_override=None):
-    """Validate and normalize one row, returning (values, error_message)."""
+    """Validate values and convert the user-selected area to hectares."""
     if not isinstance(payload, dict):
         return None, "Send prediction inputs as a JSON object."
 
@@ -124,6 +164,18 @@ def parse_prediction_input(payload, crop_override=None):
     for field in ["Annual_Rainfall", "Fertilizer", "Pesticide"]:
         if values[field] < 0:
             return None, f"{field} cannot be negative."
+
+    area_unit_raw = payload.get("Area_Unit", "hectare")
+    if not isinstance(area_unit_raw, str):
+        return None, "Area_Unit must be hectare or acre."
+    area_unit = AREA_UNIT_ALIASES.get(area_unit_raw.strip().casefold())
+    if area_unit is None:
+        return None, "Area unit must be hectare (ha) or acre. Convert local bigha to hectares first."
+    input_area = values["Area"]
+    values["Area_Input"] = input_area
+    values["Area_Unit"] = area_unit
+    if area_unit == "acre":
+        values["Area"] = input_area * ACRE_TO_HECTARE
 
     for field in CATEGORICAL_FIELDS:
         raw = crop_override if field == "Crop" and crop_override is not None else payload.get(field)
@@ -156,19 +208,88 @@ def predict_rows(rows):
     return predictions
 
 
+def prediction_warnings(values, prediction):
+    """Flag inputs/predictions outside the selected crop's observed data range.
+
+    These are support warnings, not confidence intervals or recommendations.
+    """
+    warnings = []
+    frame = load_dataset()
+    crop_rows = frame.loc[frame["Crop"].astype(str).str.casefold() == values["Crop"].casefold()]
+    if crop_rows.empty:
+        return warnings
+    if len(crop_rows) < 50:
+        warnings.append(
+            f"Limited training support: only {len(crop_rows)} dataset records are available for {values['Crop']}."
+        )
+
+    for field, label in [
+        ("Area", "Area"),
+        ("Annual_Rainfall", "Rainfall"),
+        ("Fertilizer", "Fertilizer"),
+        ("Pesticide", "Pesticide"),
+    ]:
+        series = pd.to_numeric(crop_rows[field], errors="coerce").dropna()
+        if len(series) < 10:
+            continue
+        lower, upper = series.quantile([0.01, 0.99]).tolist()
+        if values[field] < lower or values[field] > upper:
+            warnings.append(
+                f"{label} is outside the central 98% of the dataset's {values['Crop']} examples; prediction reliability may be lower."
+            )
+
+    yield_series = pd.to_numeric(crop_rows["Yield"], errors="coerce").dropna()
+    if len(yield_series) >= 10:
+        lower, upper = yield_series.quantile([0.01, 0.99]).tolist()
+        if prediction < lower or prediction > upper:
+            warnings.append(
+                f"Predicted yield is outside the central 98% of observed {values['Crop']} yields; treat it as an extrapolation."
+            )
+    return warnings
+
+
+def build_prediction_result(values, prediction):
+    units = crop_yield_units(values["Crop"])
+    area_hectares = float(values["Area"])
+    total_production = float(prediction * area_hectares)
+    warnings = prediction_warnings(values, prediction)
+    warnings.append(
+        "This is a statistical estimate from state-level historical data, not a farm-specific guarantee or fertilizer/pesticide recommendation."
+    )
+    return {
+        "predicted_yield": float(prediction),
+        "yield_unit": units["yield_unit"],
+        "estimated_total_production": total_production,
+        "production_unit": units["production_unit"],
+        "area_hectares": area_hectares,
+        "input_area": float(values["Area_Input"]),
+        "input_area_unit": values["Area_Unit"],
+        "fertilizer_kg": float(values["Fertilizer"]),
+        "pesticide_kg": float(values["Pesticide"]),
+        "annual_rainfall_mm": float(values["Annual_Rainfall"]),
+        "unit_note": units["unit_note"],
+        "warnings": warnings,
+    }
+
+
 @app.get("/")
 def home():
     return jsonify({
         "service": "Crop Yield Prediction API",
         "status": "ok",
         "endpoints": ["/health", "/options", "/summary", "/predict", "/compare"],
+        "units": {
+            "Area": "hectares internally; acre input supported",
+            "Annual_Rainfall": "mm",
+            "Fertilizer": "kg total",
+            "Pesticide": "kg total",
+            "Yield": "tonnes/ha for mass crops; nuts/ha for Coconut",
+        },
     })
 
 
 @app.get("/health")
 def health():
-    # Keep this endpoint cheap: it should not deserialize the 67 MB model on
-    # every dashboard visit or wake a worker unnecessarily.
     artifacts_available = MODEL_PATH.is_file() and PREPROCESSOR_PATH.is_file()
     dataset_available = DATASET_PATH.is_file()
     if not artifacts_available or not dataset_available:
@@ -229,8 +350,11 @@ def predict():
         error = validate_categories(values, available)
         if error:
             return jsonify({"error": error}), 400
+
         prediction = float(predict_rows([values])[0])
-        return jsonify({"predicted_yield": prediction, "unit": "dataset yield units"})
+        if prediction < 0:
+            return jsonify({"error": "The model returned a negative yield. Please review the model and input data."}), 500
+        return jsonify(build_prediction_result(values, prediction))
     except FileNotFoundError as exc:
         logger.exception("Required project artifact missing")
         return jsonify({"error": str(exc)}), 503
@@ -249,6 +373,12 @@ def compare():
         return jsonify({"error": "Select between 2 and 8 crops to compare."}), 400
     if any(not isinstance(crop, str) for crop in crops) or len(set(crops)) != len(crops):
         return jsonify({"error": "Choose 2–8 different crop names."}), 400
+
+    unit_groups = {crop_yield_units(crop)["unit_group"] for crop in crops}
+    if len(unit_groups) != 1:
+        return jsonify({
+            "error": "These crops use different yield units. Coconut is measured in nuts/ha, while the other crops are measured in tonnes/ha; compare crops with the same unit only."
+        }), 400
 
     base_payload = dict(payload)
     base_payload["Crop"] = crops[0]
@@ -270,13 +400,23 @@ def compare():
             return jsonify({"error": error}), 400
 
         rows = [{**base_values, "Crop": crop} for crop in crops]
-        values = predict_rows(rows)
-        results = [
-            {"crop": crop, "predicted_yield": float(value)}
-            for crop, value in zip(crops, values)
-        ]
+        predictions = predict_rows(rows)
+        results = []
+        for crop, prediction in zip(crops, predictions):
+            units = crop_yield_units(crop)
+            results.append({
+                "crop": crop,
+                "predicted_yield": float(prediction),
+                "yield_unit": units["yield_unit"],
+                "estimated_total_production": float(prediction * base_values["Area"]),
+                "production_unit": units["production_unit"],
+            })
         results.sort(key=lambda item: item["predicted_yield"], reverse=True)
-        return jsonify({"predictions": results, "unit": "dataset yield units"})
+        return jsonify({
+            "predictions": results,
+            "yield_unit": results[0]["yield_unit"],
+            "area_hectares": float(base_values["Area"]),
+        })
     except FileNotFoundError as exc:
         logger.exception("Required project artifact missing")
         return jsonify({"error": str(exc)}), 503
