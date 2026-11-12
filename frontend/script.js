@@ -8,8 +8,7 @@
 // API URL
 // ==========================================
 
-const API_BASE_URL =
-    "https://crop-yield-prediction-api-cizc.onrender.com";
+const API_BASE_URL = (window.CROP_YIELD_API_URL || "https://crop-yield-prediction-api-cizc.onrender.com").replace(/\/$/, "");
 
 
 // ==========================================
@@ -34,10 +33,13 @@ async function loadOptions() {
 
     try {
 
-        const response =
-            await fetch(
-                `${API_BASE_URL}/options`
-            );
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const response = await fetch(`${API_BASE_URL}/options`, {
+            signal: controller.signal,
+            headers: { "Accept": "application/json" }
+        });
+        clearTimeout(timeout);
 
         if (!response.ok) {
 
@@ -416,21 +418,15 @@ form.addEventListener(
 
         try {
 
-            const response =
-                await fetch(
-                    `${API_BASE_URL}/predict`,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body:
-                            JSON.stringify(data)
-                    }
-                );
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 25000);
+            const response = await fetch(`${API_BASE_URL}/predict`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                body: JSON.stringify(data),
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
 
 
             // --------------------------------
@@ -488,6 +484,10 @@ form.addEventListener(
             const prediction =
                 resultData.predicted_yield;
 
+            if (!Number.isFinite(prediction)) {
+                throw new Error("The server returned an invalid prediction.");
+            }
+
 
             // --------------------------------
             // SHOW RESULT
@@ -544,19 +544,15 @@ form.addEventListener(
             );
 
 
+            const safeMessage = error.name === "AbortError"
+                ? "The prediction service took too long to respond. Please retry."
+                : error.message;
             result.innerHTML = `
-
-                <div class="error-message">
-
-                    ❌ Unable to get prediction.
-
-                    <br><br>
-
-                    Please check the server
-                    connection and try again.
-
+                <div class="error-message" role="alert">
+                    <strong>Prediction unavailable</strong>
+                    <p>${safeMessage}</p>
+                    <p>Check the API service connection and try again.</p>
                 </div>
-
             `;
 
         } finally {
@@ -589,3 +585,24 @@ form.addEventListener(
 showDefaultResult();
 
 loadOptions();
+
+/* Accessible API status indicator for the dashboard. */
+async function checkApiHealth() {
+    const badge = document.getElementById("apiStatus");
+    if (!badge) return;
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            headers: { "Accept": "application/json" },
+            signal: AbortSignal.timeout(10000)
+        });
+        if (!response.ok) throw new Error("API unavailable");
+        badge.textContent = "Prediction API online";
+        badge.classList.add("is-online");
+        badge.classList.remove("is-offline");
+    } catch (_) {
+        badge.textContent = "API connection unavailable";
+        badge.classList.add("is-offline");
+        badge.classList.remove("is-online");
+    }
+}
+checkApiHealth();
