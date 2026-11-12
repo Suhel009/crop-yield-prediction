@@ -1214,3 +1214,58 @@ footer {
     top: auto;
 }
 .unit-note { display: block; margin-top: 10px; color: #718078; font-size: 11px; }
+
+
+/* Explicit measurement-unit controls and transparent prediction results */
+.unit-input-row { display: flex; align-items: stretch; gap: 9px; }
+.area-number { flex: 1 1 auto; min-width: 0; }
+.unit-select {
+    width: 132px;
+    flex: 0 0 132px;
+    height: 51px;
+    padding: 0 10px;
+    border: 1px solid #dce6df;
+    border-radius: 10px;
+    background: #fff;
+    color: #20372c;
+    font: inherit;
+    font-size: 12px;
+}
+.field-help { display: block; margin-top: 7px; color: #718078; font-size: 11px; line-height: 1.45; }
+.prediction-details {
+    width: 100%;
+    margin: 15px 0 10px;
+    padding: 14px 16px;
+    border: 1px solid #e5ece7;
+    border-radius: 12px;
+    background: #fbfdfb;
+    text-align: left;
+}
+.prediction-details p { color: #53675d; font-size: 12px; line-height: 1.6; margin: 4px 0; }
+.production-caveat {
+    margin: 8px 0 12px;
+    padding: 12px 14px;
+    background: #fff8e9;
+    border: 1px solid #f2dfb2;
+    color: #77551a;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.55;
+    text-align: left;
+}
+.prediction-warning {
+    margin: 8px 0;
+    padding: 11px 13px;
+    background: #fff8e9;
+    border: 1px solid #f2dfb2;
+    color: #77551a;
+    border-radius: 10px;
+    text-align: left;
+    font-size: 11px;
+    line-height: 1.55;
+}
+.quality-stat { border-color: #eadab5; }
+@media (max-width: 450px) {
+    .unit-input-row { gap: 7px; }
+    .unit-select { width: 118px; flex-basis: 118px; font-size: 11px; }
+}

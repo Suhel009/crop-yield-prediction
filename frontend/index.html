@@ -118,7 +118,6 @@
                     🤖 ML Model: Tuned Random Forest
                 </div>
                 <div class="api-status" id="apiStatus" role="status" aria-live="polite">Checking prediction service…</div>
-                <div class="api-status" id="apiStatus" role="status" aria-live="polite">Checking prediction service…</div>
 
                 <h2>
                     Predict Crop Yield<br>
@@ -139,6 +138,7 @@
             <article class="stat-card"><span class="stat-label">Crop varieties</span><strong id="datasetCrops">—</strong><small>available in dataset</small></article>
             <article class="stat-card"><span class="stat-label">States / regions</span><strong id="datasetStates">—</strong><small>represented in data</small></article>
             <article class="stat-card"><span class="stat-label">Year coverage</span><strong id="datasetYears">—</strong><small>historical records</small></article>
+            <article class="stat-card quality-stat"><span class="stat-label">Yield consistency check</span><strong id="datasetConsistency">—</strong><small>records matching Production ÷ Area within 5%</small></article>
         </section>
 
         <!-- ================= PREDICTION AREA ================= -->
@@ -255,7 +255,7 @@
                         <div class="form-group">
 
                             <label for="fertilizer">
-                                Fertilizer
+                                Fertilizer (total kg)
                             </label>
 
                             <div class="input-wrapper">
@@ -274,6 +274,7 @@
                                 >
 
                             </div>
+                            <small class="field-help">Total fertilizer used across the entered crop area, in kilograms (kg), not kg/ha.</small>
 
                         </div>
 
@@ -310,7 +311,7 @@
                         <div class="form-group">
 
                             <label for="pesticide">
-                                Pesticide
+                                Pesticide (total kg)
                             </label>
 
                             <div class="input-wrapper">
@@ -329,6 +330,7 @@
                                 >
 
                             </div>
+                            <small class="field-help">Total pesticide used across the entered crop area, in kilograms (kg). For liquids, use kg only when the product mass is known; do not treat litres as kg.</small>
 
                         </div>
 
@@ -360,30 +362,32 @@
                         </div>
 
 
-                        <!-- Area -->
+                        <!-- Cultivated area -->
 
                         <div class="form-group">
 
                             <label for="area">
-                                Area
+                                Cultivated Area
                             </label>
 
-                            <div class="input-wrapper">
-
-                                <span class="input-icon">
-                                    ▥
-                                </span>
-
-                                <input
-                                    type="number"
-                                    id="area"
-                                    value="1000"
-                                    min="0.01"
-                                    step="any"
-                                    required
-                                >
-
+                            <div class="unit-input-row">
+                                <div class="input-wrapper area-number">
+                                    <span class="input-icon">▥</span>
+                                    <input
+                                        type="number"
+                                        id="area"
+                                        value="1000"
+                                        min="0.01"
+                                        step="any"
+                                        required
+                                    >
+                                </div>
+                                <select id="areaUnit" class="unit-select" aria-label="Area unit">
+                                    <option value="hectare" selected>Hectares (ha)</option>
+                                    <option value="acre">Acres</option>
+                                </select>
                             </div>
+                            <small class="field-help">Acres are automatically converted to hectares. Bigha varies by region; convert your local bigha to hectares before entering it.</small>
 
                         </div>
 
@@ -394,7 +398,7 @@
                         <label for="compareCrops">Compare crops (select 2–8)</label>
                         <select id="compareCrops" multiple size="5" aria-describedby="compareHelp">
                         </select>
-                        <small id="compareHelp">Hold Ctrl (Windows) or Command (Mac) to select multiple crops.</small>
+                        <small id="compareHelp">Hold Ctrl (Windows) or Command (Mac) to select multiple crops. Coconut is kept separate because its physical yield unit is not verified in this source.</small>
                     </div>
 
                     <!-- Predict Button -->
