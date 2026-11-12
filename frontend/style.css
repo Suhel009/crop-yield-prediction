@@ -1151,3 +1151,54 @@ footer {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+
+/* Data-rich dashboard additions */
+.stats-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin: 0 0 24px;
+}
+.stat-card {
+    background: rgba(255,255,255,.94);
+    border: 1px solid #e2ece5;
+    border-radius: 16px;
+    padding: 17px 19px;
+    box-shadow: 0 8px 24px rgba(16,70,40,.045);
+}
+.stat-label, .stat-card small { display: block; color: #718078; font-size: 11px; font-weight: 650; }
+.stat-card strong { display: block; margin: 7px 0 3px; color: #0c3d2b; font-size: 27px; letter-spacing: -.7px; }
+.api-status { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 12px; border-radius: 999px; background: #eef3ef; color: #52645a; font-size: 12px; font-weight: 700; }
+.api-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #8a9a90; }
+.api-status.is-online { background: #e8f7ed; color: #087b40; }
+.api-status.is-online::before { background: #16a05a; box-shadow: 0 0 0 4px rgba(22,160,90,.12); }
+.api-status.is-offline { background: #fff1ed; color: #aa4227; }
+.api-status.is-offline::before { background: #d85b3d; }
+.compare-picker { margin-top: 20px; display: grid; gap: 8px; }
+.compare-picker label { color: #40564c; font-size: 13px; font-weight: 700; }
+.compare-picker select { min-height: 116px; padding: 9px; border: 1px solid #dce6df; border-radius: 10px; background: #fff; }
+.compare-picker small { color: #718078; font-size: 11px; }
+.compare-btn { width: 100%; min-height: 46px; margin-top: 10px; border: 1px solid #16864a; border-radius: 10px; background: #fff; color: #087b40; font-weight: 750; cursor: pointer; transition: .2s; }
+.compare-btn:hover { background: #eef9f1; transform: translateY(-1px); }
+.compare-btn:disabled { opacity: .6; cursor: wait; }
+.comparison-note { color: #718078; font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+.comparison-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 13px 15px; margin: 8px 0; border: 1px solid #e4eee7; border-radius: 11px; background: #fbfefb; color: #294637; font-size: 13px; }
+.comparison-row:first-of-type { border-color: #8bd0a4; background: #effaf2; }
+.comparison-winner { margin-top: 14px; }
+.history-section { margin-top: 34px; padding: 28px; border-radius: 19px; background: #fff; border: 1px solid #e5ece7; }
+.history-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 17px; }
+.history-heading h2 { margin-top: 8px; color: #123b2b; font-size: 23px; }
+.text-btn { border: 0; background: transparent; color: #16864a; font-size: 12px; font-weight: 700; cursor: pointer; }
+.history-list { display: grid; gap: 9px; }
+.history-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 13px 15px; border-radius: 11px; background: #f7faf7; border: 1px solid #e9f0eb; }
+.history-item strong, .history-item small { display: block; }
+.history-item strong { color: #204333; font-size: 13px; }
+.history-item small, .history-empty { color: #718078; font-size: 11px; margin-top: 4px; }
+.history-item b { color: #087b40; font-size: 17px; }
+.error-message { text-align: left; line-height: 1.6; }
+.predict-btn:focus-visible, .compare-btn:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(39,168,94,.35); outline-offset: 2px; }
+@media (max-width: 1100px) { .stats-strip { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 800px) { .stats-strip { gap: 9px; } .stat-card { padding: 13px; } .stat-card strong { font-size: 22px; } .history-section { padding: 20px; } }
+@media (max-width: 450px) { .history-heading { align-items: flex-start; } .stat-card small { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
