@@ -113,6 +113,7 @@
                     🤖 ML Model: Tuned Random Forest
                 </div>
                 <div class="api-status" id="apiStatus" role="status" aria-live="polite">Checking prediction service…</div>
+                <div class="api-status" id="apiStatus" role="status" aria-live="polite">Checking prediction service…</div>
 
                 <h2>
                     Predict Crop Yield<br>
@@ -128,6 +129,12 @@
 
         </section>
 
+        <section class="stats-strip" aria-label="Dataset overview">
+            <article class="stat-card"><span class="stat-label">Training records</span><strong id="datasetRecords">—</strong><small>cleaned observations</small></article>
+            <article class="stat-card"><span class="stat-label">Crop varieties</span><strong id="datasetCrops">—</strong><small>available in dataset</small></article>
+            <article class="stat-card"><span class="stat-label">States / regions</span><strong id="datasetStates">—</strong><small>represented in data</small></article>
+            <article class="stat-card"><span class="stat-label">Year coverage</span><strong id="datasetYears">—</strong><small>historical records</small></article>
+        </section>
 
         <!-- ================= PREDICTION AREA ================= -->
 
@@ -378,6 +385,13 @@
                     </div>
 
 
+                    <div class="compare-picker">
+                        <label for="compareCrops">Compare crops (select 2–8)</label>
+                        <select id="compareCrops" multiple size="5" aria-describedby="compareHelp">
+                        </select>
+                        <small id="compareHelp">Hold Ctrl (Windows) or Command (Mac) to select multiple crops.</small>
+                    </div>
+
                     <!-- Predict Button -->
 
                     <button
@@ -392,6 +406,8 @@
 
                     </button>
 
+
+                    <button type="button" class="compare-btn" id="compareBtn">Compare Selected Crops</button>
 
                     <div class="secure-note">
                         ✓ Your inputs are used only for prediction
@@ -550,6 +566,19 @@
 
         </section>
 
+
+        <section class="history-section" id="history">
+            <div class="history-heading">
+                <div>
+                    <span class="section-tag">YOUR RECENT ACTIVITY</span>
+                    <h2>Prediction History</h2>
+                </div>
+                <button type="button" class="text-btn" id="clearHistoryBtn">Clear history</button>
+            </div>
+            <div class="history-list" id="predictionHistory">
+                <p class="history-empty">Your recent predictions will appear here on this device.</p>
+            </div>
+        </section>
 
         <!-- ================= ABOUT ================= -->
 
