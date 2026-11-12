@@ -98,6 +98,17 @@ class PredictionApiTests(unittest.TestCase):
         response = self.client.post("/compare", json=payload)
         self.assertEqual(response.status_code, 400)
 
+    def test_summary_returns_data_driven_counts(self):
+        response = self.client.get("/summary")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["crops"], 3)
+        self.assertEqual(response.get_json()["dataset_records"], 17321)
+
+    def test_health_is_lightweight_and_reports_artifact_presence(self):
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "healthy")
+
 
 if __name__ == "__main__":
     unittest.main()
