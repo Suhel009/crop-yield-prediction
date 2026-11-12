@@ -32,7 +32,7 @@ allowed_origins = [
     for origin in os.getenv(
         "FRONTEND_ORIGINS",
         "https://crop-yield-prediction-ai.netlify.app,"
-        "http://localhost:5500,http://127.0.0.1:5500"
+        "http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000"
     ).split(",")
     if origin.strip()
 ]
