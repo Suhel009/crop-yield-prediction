@@ -118,7 +118,6 @@
                     🤖 ML Model: Tuned Random Forest
                 </div>
                 <div class="api-status" id="apiStatus" role="status" aria-live="polite">Checking prediction service…</div>
-                <div class="api-status" id="apiStatus" role="status" aria-live="polite">Checking prediction service…</div>
 
                 <h2>
                     Predict Crop Yield<br>
@@ -171,9 +170,7 @@
 
                         <div class="form-group">
 
-                            <label for="year">
-                                Year
-                            </label>
+                            <label for="year">Crop Year</label>
 
                             <div class="input-wrapper">
 
@@ -191,6 +188,7 @@
                                 >
 
                             </div>
+                            <small class="field-help">Select a crop year represented in the training dataset. This is not a weather forecast.</small>
 
                         </div>
 
@@ -199,9 +197,7 @@
 
                         <div class="form-group">
 
-                            <label for="rainfall">
-                                Annual Rainfall (mm)
-                            </label>
+                            <label for="rainfall">Annual Rainfall (mm/year)</label>
 
                             <div class="input-wrapper">
 
@@ -219,6 +215,7 @@
                                 >
 
                             </div>
+                            <small class="field-help">Total rainfall for the crop year, not daily rainfall.</small>
 
                         </div>
 
@@ -254,9 +251,7 @@
 
                         <div class="form-group">
 
-                            <label for="fertilizer">
-                                Fertilizer
-                            </label>
+                            <label for="fertilizer">Total Fertilizer Used (kg)</label>
 
                             <div class="input-wrapper">
 
@@ -274,6 +269,8 @@
                                 >
 
                             </div>
+                            <small class="field-help">Total kilograms used across the entered crop area—not kg/ha.</small>
+                            <small class="field-derived" id="fertilizerRate">Per-hectare rate: —</small>
 
                         </div>
 
@@ -309,9 +306,7 @@
 
                         <div class="form-group">
 
-                            <label for="pesticide">
-                                Pesticide
-                            </label>
+                            <label for="pesticide">Total Pesticide Used (kg)</label>
 
                             <div class="input-wrapper">
 
@@ -329,6 +324,8 @@
                                 >
 
                             </div>
+                            <small class="field-help">Enter product mass in kg. Do not enter litres as kg unless you know the product density.</small>
+                            <small class="field-derived" id="pesticideRate">Per-hectare rate: —</small>
 
                         </div>
 
@@ -360,20 +357,14 @@
                         </div>
 
 
-                        <!-- Area -->
+                        <!-- Cultivated area: converted to hectares before model inference -->
 
-                        <div class="form-group">
+                        <div class="form-group area-form-group">
 
-                            <label for="area">
-                                Area
-                            </label>
+                            <label for="area">Cultivated Land Area</label>
 
-                            <div class="input-wrapper">
-
-                                <span class="input-icon">
-                                    ▥
-                                </span>
-
+                            <div class="input-wrapper area-input-wrapper">
+                                <span class="input-icon">▥</span>
                                 <input
                                     type="number"
                                     id="area"
@@ -381,9 +372,21 @@
                                     min="0.01"
                                     step="any"
                                     required
+                                    aria-describedby="areaHelp areaPreview"
                                 >
-
+                                <select id="areaUnit" class="area-unit-select" aria-label="Area input unit">
+                                    <option value="hectare">Hectare</option>
+                                    <option value="acre">Acre</option>
+                                    <option value="bigha">Bigha</option>
+                                </select>
                             </div>
+                            <small class="field-help" id="areaHelp">Choose your land unit. The model always receives hectares (ha).</small>
+                            <div id="bighaConversionGroup" class="bigha-conversion" hidden>
+                                <label for="bighaHectares">Local size of 1 bigha (in hectares)</label>
+                                <input type="number" id="bighaHectares" min="0.0001" step="any" placeholder="Enter local conversion, e.g. from land records">
+                                <small>Bigha varies by state and district. Do not use a generic conversion.</small>
+                            </div>
+                            <small class="field-derived" id="areaPreview">Model input: 1,000.00 ha</small>
 
                         </div>
 
@@ -394,7 +397,7 @@
                         <label for="compareCrops">Compare crops (select 2–8)</label>
                         <select id="compareCrops" multiple size="5" aria-describedby="compareHelp">
                         </select>
-                        <small id="compareHelp">Hold Ctrl (Windows) or Command (Mac) to select multiple crops.</small>
+                        <small id="compareHelp">Select 2–8 crops. Different crops may have different source yield units, so results are displayed without a cross-crop ranking.</small>
                     </div>
 
                     <!-- Predict Button -->
@@ -470,9 +473,7 @@
                         <span>💡</span>
 
                         <p>
-                            Enter the agricultural parameters
-                            and click Predict Yield to get the
-                            machine learning prediction.
+                            Enter farm details with the units shown. The model returns a source-dataset yield estimate per hectare; physical output units may vary by crop.
                         </p>
 
                     </div>
@@ -497,11 +498,10 @@
 
                 <div>
 
-                    <h3>High Accuracy</h3>
+                    <h3>Trained ML Model</h3>
 
                     <p>
-                        Tuned machine learning model
-                        trained on agricultural data.
+                        Random Forest estimates learned from historical agricultural records.
                     </p>
 
                 </div>
@@ -603,9 +603,7 @@
                 </h2>
 
                 <p>
-                    This project uses machine learning algorithms
-                    to estimate crop yield from historical agricultural
-                    and environmental data.
+                    This project estimates the dataset's crop-yield target from historical agricultural and environmental inputs. Input quantities are normalized before inference. Output units are not harmonized across every crop in the source data, so the app reports the source-native yield scale rather than inventing a universal tonne value.
                 </p>
 
             </div>
