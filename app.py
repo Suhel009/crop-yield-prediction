@@ -49,6 +49,22 @@ FEATURES = [
     "Year", "State", "Crop", "Season", "Area",
     "Annual_Rainfall", "Fertilizer", "Pesticide"
 ]
+
+# API contract: Area is always hectares; fertilizer and pesticide are total kg
+# applied across that area; rainfall is annual millimetres.
+INPUT_UNITS = {
+    "Area": "hectare (ha)",
+    "Annual_Rainfall": "millimetres per year (mm)",
+    "Fertilizer": "kilograms total across the entered area (kg)",
+    "Pesticide": "kilograms total across the entered area (kg)",
+}
+YIELD_UNIT = "dataset-native yield units per hectare"
+YIELD_UNIT_NOTE = (
+    "The source dataset does not provide a verified, harmonised production "
+    "unit for every crop. This result is the model's estimate in the source "
+    "Yield scale per hectare; do not convert it to tonnes or compare raw "
+    "values across different crops without crop-specific unit metadata."
+)
 NUMERIC_FIELDS = ["Year", "Area", "Annual_Rainfall", "Fertilizer", "Pesticide"]
 CATEGORICAL_FIELDS = ["State", "Crop", "Season"]
 
@@ -94,6 +110,14 @@ def load_options():
             "year_min": int(years.min()) if not years.empty else 2000,
             "year_max": int(years.max()) if not years.empty else 2026,
             "dataset_rows": int(len(frame)),
+            "input_units": {
+                "area": INPUT_UNITS["Area"],
+                "rainfall": INPUT_UNITS["Annual_Rainfall"],
+                "fertilizer": INPUT_UNITS["Fertilizer"],
+                "pesticide": INPUT_UNITS["Pesticide"],
+            },
+            "yield_unit": YIELD_UNIT,
+            "yield_unit_note": YIELD_UNIT_NOTE,
         }
     return options_cache
 
@@ -230,7 +254,27 @@ def predict():
         if error:
             return jsonify({"error": error}), 400
         prediction = float(predict_rows([values])[0])
-        return jsonify({"predicted_yield": prediction, "unit": "dataset yield units"})
+        if prediction < 0:
+            return jsonify({
+                "error": "The model returned a negative yield, which is not physically valid. Review the inputs and model training data."
+            }), 422
+
+        area_ha = values["Area"]
+        input_summary = {
+            "area_ha": area_ha,
+            "annual_rainfall_mm": values["Annual_Rainfall"],
+            "fertilizer_total_kg": values["Fertilizer"],
+            "fertilizer_kg_per_ha": values["Fertilizer"] / area_ha,
+            "pesticide_total_kg": values["Pesticide"],
+            "pesticide_kg_per_ha": values["Pesticide"] / area_ha,
+        }
+        return jsonify({
+            "predicted_yield": prediction,
+            "unit": YIELD_UNIT,
+            "unit_note": YIELD_UNIT_NOTE,
+            "input_summary": input_summary,
+            "total_production_estimate": None,
+        })
     except FileNotFoundError as exc:
         logger.exception("Required project artifact missing")
         return jsonify({"error": str(exc)}), 503
@@ -275,8 +319,18 @@ def compare():
             {"crop": crop, "predicted_yield": float(value)}
             for crop, value in zip(crops, values)
         ]
-        results.sort(key=lambda item: item["predicted_yield"], reverse=True)
-        return jsonify({"predictions": results, "unit": "dataset yield units"})
+        # Preserve the user's selection order. Cross-crop yield values may use
+        # different source production units, so a numeric leaderboard would be
+        # scientifically misleading without crop-level unit harmonisation.
+        return jsonify({
+            "predictions": results,
+            "unit": YIELD_UNIT,
+            "comparison_note": (
+                "Values are shown without ranking. The source does not verify "
+                "one common production unit across all crop types; compare "
+                "different crops only after checking their crop-specific units."
+            ),
+        })
     except FileNotFoundError as exc:
         logger.exception("Required project artifact missing")
         return jsonify({"error": str(exc)}), 503
